@@ -49,11 +49,29 @@ public:
     const juce::String getProgramName (int index) override;
     void changeProgramName (int index, const juce::String& newName) override;
 
+    juce::AudioParameterFloat* inputGainParameter;
+    juce::AudioParameterFloat* outputGainParameter;
+    
     //==============================================================================
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
+    juce::AudioProcessorValueTreeState apvts;
+    
 private:
     //==============================================================================
+    
+    using Type = float;
+    
+    enum {
+        preGainIndex,
+        waveshaperIndex, // [2]
+        postGainIndex
+    };
+    
+    juce::dsp::Oversampling<float> oversampler;
+    juce::dsp::ProcessorChain<juce::dsp::Gain<Type>, juce::dsp::WaveShaper<float>, juce::dsp::Gain<Type>> processorChain;
+    
+    
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SaturatorAudioProcessor)
 };

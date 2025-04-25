@@ -19,9 +19,33 @@ SaturatorAudioProcessor::SaturatorAudioProcessor()
                       #endif
                        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
                      #endif
-                       )
+                       ),
+                apvts(*this, nullptr, "PluginState", {
+                    std::make_unique<juce::AudioParameterFloat> (
+                        "inputGain",                // Parameter ID
+                        "Input Gain",               // Parameter name
+                        juce::NormalisableRange<float> (-60.0f, 60.0f, 0.1f), // Range and step size
+                        30.0f                       // Default value
+                    ),
+                    std::make_unique<juce::AudioParameterFloat> (
+                        "outputGain",                // Parameter ID
+                        "Output Gain",               // Parameter name
+                        juce::NormalisableRange<float> (-60.0f, 60.0f, 0.1f), // Range and step size
+                        30.0f                       // Default value
+                    )
+                })
 #endif
 {
+    auto& waveshaper = processorChain.template get<waveshaperIndex>();
+    waveshaper.functionToUse = [] (Type x) {
+        return std::tanh(x);
+    };
+    
+    auto& preGain = processorChain.template get<preGainIndex>();
+    preGain.setGainDecibels (apvts.getParameterAsValue ("inputGain").getValue()); // Initialize with APVTS value
+
+    auto& postGain = processorChain.template get<postGainIndex>();
+    preGain.setGainDecibels (apvts.getParameterAsValue ("outputGain").getValue()); // Initialize with APVTS value
 }
 
 SaturatorAudioProcessor::~SaturatorAudioProcessor()
@@ -95,12 +119,21 @@ void SaturatorAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBl
 {
     // Use this method as the place to do any pre-playback
     // initialisation that you need..
+    
+    juce::dsp::ProcessSpec spec;
+    spec.sampleRate = sampleRate;
+    spec.maximumBlockSize = static_cast<juce::uint32> (samplesPerBlock);
+    spec.numChannels = getTotalNumOutputChannels();
+    
+    processorChain.prepare(spec);
 }
 
 void SaturatorAudioProcessor::releaseResources()
 {
     // When playback stops, you can use this as an opportunity to free up any
     // spare memory, etc.
+    
+    processorChain.reset();
 }
 
 #ifndef JucePlugin_PreferredChannelConfigurations
@@ -144,6 +177,7 @@ void SaturatorAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear (i, 0, buffer.getNumSamples());
 
+    /*
     // This is the place where you'd normally do the guts of your plugin's
     // audio processing...
     // Make sure to reset the state if your inner loop is processing
@@ -155,7 +189,17 @@ void SaturatorAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
         auto* channelData = buffer.getWritePointer (channel);
 
         // ..do something to the data...
-    }
+    }*/
+    
+    // Update the pre-gain value from the APVTS in each block
+    auto& preGain = processorChain.template get<preGainIndex>();
+    preGain.setGainDecibels (apvts.getParameterAsValue ("inputGain").getValue());
+    
+    auto& postGain = processorChain.template get<postGainIndex>();
+    postGain.setGainDecibels (apvts.getParameterAsValue ("outputGain").getValue());
+    
+    juce::dsp::AudioBlock<float> block (buffer);
+    processorChain.process(juce::dsp::ProcessContextReplacing<float> (block));
 }
 
 //==============================================================================
@@ -172,15 +216,23 @@ juce::AudioProcessorEditor* SaturatorAudioProcessor::createEditor()
 //==============================================================================
 void SaturatorAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
-    // You should use this method to store your parameters in the memory block.
-    // You could do that either as raw data, or use the XML or ValueTree classes
-    // as intermediaries to make it easy to save and load complex data.
+    // Save the APVTS state
+    std::unique_ptr<juce::XmlElement> xml (apvts.state.createXml());
+    copyXmlToBinary (*xml, destData);
 }
 
 void SaturatorAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
-    // You should use this method to restore your parameters from this memory block,
-    // whose contents will have been created by the getStateInformation() call.
+    // Restore the APVTS state
+    std::unique_ptr<juce::XmlElement> xmlState (getXmlFromBinary (data, sizeInBytes));
+
+    if (xmlState.get() != nullptr)
+    {
+        if (xmlState->hasTagName (apvts.state.getType()))
+        {
+            apvts.state = juce::ValueTree::fromXml (*xmlState);
+        }
+    }
 }
 
 //==============================================================================

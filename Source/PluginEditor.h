@@ -28,6 +28,10 @@ private:
     // This reference is provided as a quick way for your editor to
     // access the processor object that created it.
     SaturatorAudioProcessor& audioProcessor;
-
+    juce::Slider inputGainSlider;
+    juce::AudioProcessorValueTreeState::SliderAttachment inputGainSliderAttachment;
+    juce::Slider outputGainSlider;
+    juce::AudioProcessorValueTreeState::SliderAttachment outputGainSliderAttachment;
+    
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SaturatorAudioProcessorEditor)
 };
