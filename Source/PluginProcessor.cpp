@@ -38,7 +38,8 @@ SaturatorAudioProcessor::SaturatorAudioProcessor()
 {
     auto& waveshaper = processorChain.template get<waveshaperIndex>();
     waveshaper.functionToUse = [] (Type x) {
-        return std::tanh(x);
+        
+        return (x + x*x);
     };
     
     auto& preGain = processorChain.template get<preGainIndex>();

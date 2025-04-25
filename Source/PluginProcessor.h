@@ -69,7 +69,7 @@ private:
         postGainIndex
     };
     
-    juce::dsp::Oversampling<float> oversampler;
+    //juce::dsp::Oversampling<float> oversampler;
     juce::dsp::ProcessorChain<juce::dsp::Gain<Type>, juce::dsp::WaveShaper<float>, juce::dsp::Gain<Type>> processorChain;
     
     
